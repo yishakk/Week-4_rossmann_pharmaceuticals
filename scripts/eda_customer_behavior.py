@@ -30,11 +30,11 @@ class CustomerBehaviorEDA:
 
     def clean_data(self):
         self.logger.info("Cleaning data...")
-        cleaning_pipeline = self.train.select_dtypes(include=['number']).columns
         cleaning_pipeline = Pipeline([
             ('imputer', SimpleImputer(strategy='median'))
         ])
         missing_cols = self.train.columns[self.train.isnull().any()]
+        missing_cols = missing_cols.drop(['PromoInterval'])
         self.logger.info(f"Columns with missing values: {missing_cols}")
         self.train[missing_cols] = cleaning_pipeline.fit_transform(self.train[missing_cols])
         self.test[missing_cols] = cleaning_pipeline.transform(self.test[missing_cols])
@@ -61,6 +61,13 @@ class CustomerBehaviorEDA:
         sns.lineplot(data=self.train, x='Date', y='Sales', hue='HolidayPeriod').set_title("Sales Around Holidays")
         plt.show()
 
+    def analyze_seasonal_behavior(self):
+        self.logger.info("Analyzing seasonal purchase behavior...")
+        self.train['Month'] = self.train['Date'].dt.month
+        monthly_sales = self.train.groupby('Month')['Sales'].mean()
+        sns.barplot(x=monthly_sales.index, y=monthly_sales.values).set_title("Average Monthly Sales")
+        plt.show()
+
     def analyze_correlation(self):
         self.logger.info("Analyzing correlation between sales and customers...")
         correlation = self.train[['Sales', 'Customers']].corr()
@@ -79,10 +86,41 @@ class CustomerBehaviorEDA:
         sns.barplot(x=promo_customers.index, y=promo_customers.values, ax=ax[1]).set_title("Average Customers With/Without Promo")
         plt.show()
 
+    def analyze_store_opening_behavior(self):
+        self.logger.info("Analyzing customer behavior during store opening and closing times...")
+        self.train['DayOfWeek'] = self.train['Date'].dt.dayofweek
+        sns.boxplot(x='DayOfWeek', y='Sales', data=self.train).set_title("Sales by Day of the Week")
+        plt.show()
+
+    def analyze_weekday_weekend_sales(self):
+        self.logger.info("Analyzing sales on weekdays vs weekends...")
+        self.train['IsWeekend'] = self.train['DayOfWeek'].apply(lambda x: 1 if x >= 5 else 0)
+        weekend_sales = self.train.groupby('IsWeekend')['Sales'].mean()
+        sns.barplot(x=weekend_sales.index, y=weekend_sales.values).set_title("Average Sales on Weekdays vs Weekends")
+        plt.show()
+
+    def analyze_assortment_impact(self):
+        self.logger.info("Analyzing impact of assortment types on sales...")
+        assortment_sales = self.train.groupby('Assortment')['Sales'].mean()
+        sns.barplot(x=assortment_sales.index, y=assortment_sales.values).set_title("Average Sales by Assortment Type")
+        plt.show()
+
+    def analyze_competitor_distance(self):
+        self.logger.info("Analyzing effect of competitor distance on sales...")
+        sns.scatterplot(x='CompetitionDistance', y='Sales', data=self.train).set_title("Sales vs Competitor Distance")
+        plt.show()
+
+    def analyze_new_competitors(self):
+        self.logger.info("Analyzing effect of new competitors...")
+        self.train['HasNewCompetitor'] = self.train['CompetitionOpenSinceYear'].notnull()
+        new_competitor_sales = self.train.groupby('HasNewCompetitor')['Sales'].mean()
+        sns.barplot(x=new_competitor_sales.index, y=new_competitor_sales.values).set_title("Sales With/Without New Competitors")
+        plt.show()
+
     def save_cleaned_data(self):
         self.logger.info("Saving cleaned datasets...")
-        self.train.to_csv('cleaned_train.csv', index=False)
-        self.test.to_csv('cleaned_test.csv', index=False)
+        self.train.to_csv('../data/cleaned_train.csv', index=False)
+        self.test.to_csv('../data/cleaned_test.csv', index=False)
 
     def run_analysis(self):
         self.load_data()
@@ -90,6 +128,12 @@ class CustomerBehaviorEDA:
         self.detect_outliers()
         self.analyze_promo_distribution()
         self.analyze_holiday_sales()
+        self.analyze_seasonal_behavior()
         self.analyze_correlation()
         self.analyze_promo_impact()
+        self.analyze_store_opening_behavior()
+        self.analyze_weekday_weekend_sales()
+        self.analyze_assortment_impact()
+        self.analyze_competitor_distance()
+        self.analyze_new_competitors()
         self.save_cleaned_data()
